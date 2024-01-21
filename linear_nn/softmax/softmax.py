@@ -15,11 +15,27 @@ def init_weights(m):
 net.apply(init_weights)
 
 '''定义损失函数'''
-loss = nn.CrossEntropyLoss()    # reduction是none会保留数组形态，才能计算loss
+loss_fn = nn.CrossEntropyLoss()    
 
 '''定义训练过程和学习率'''
 trainer = torch.optim.SGD(net.parameters(), lr=0.1)
 
 '''训练'''
 num_epochs = 10
-d2l.train_ch3(net, train_iter, test_iter, loss, num_epochs, trainer)
+for epoch in range(num_epochs):
+    train_loss = 0
+    for image, label in train_iter:
+        loss = loss_fn(net(image), label)
+        train_loss += loss
+        
+        trainer.zero_grad()
+        loss.backward()
+        trainer.step()
+
+    with torch.no_grad():
+        test_correct = test_num = 0
+        for image, label in test_iter:
+            predict = net(image).argmax(axis=1)
+            test_correct += (predict == label).sum()
+            test_num += image.shape[0]
+    print(f'Epoch {epoch+1}, train_loss = {train_loss:.2f}, test_acc = {test_correct / test_num:.2f}')
