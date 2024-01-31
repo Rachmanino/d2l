@@ -1,16 +1,10 @@
 import pandas as pd
 import torch
 from torch import nn
-from torch.utils import data
-from sklearn.model_selection import KFold
+from torch.utils import data    
+from sklearn.model_selection import KFold   # K-fold
+from tqdm.rich import tqdm  # colorful progress-bar
 
-def log_rmse(net, features, labels):    
-    '''对数均方根误差'''
-    # 为了在取对数时进一步稳定该值，将小于1的值设置为1
-    clipped_preds = torch.clamp(net(features), 1, float('inf'))
-    rmse = torch.sqrt(criterion(torch.log(clipped_preds),
-                           torch.log(labels)))
-    return rmse.item()
 
 train_data = pd.read_csv('./train.csv')  # (1460, 80 features + 1 label)
 test_data = pd.read_csv('./test.csv')  # (1460, 80 features)
@@ -38,38 +32,49 @@ train_labels = torch.tensor(
     train_data.SalePrice.values.reshape(-1, 1), dtype=torch.float32)
 # 这里不要忘记reshape(-1, 1)来将train_labels转化为矩阵
 
-net = nn.Sequential(nn.Linear(train_features.shape[1], 1000), nn.ReLU(), nn.Dropout(0.4),
+net = nn.Sequential(nn.Linear(train_features.shape[1], 1000), nn.ReLU(), nn.Dropout(), 
                     nn.Linear(1000, 1)) #TODO: model 
 
 criterion = nn.MSELoss()
+def log_rmse(net, features, labels):    
+    '''对数均方根误差'''
+    # 为了在取对数时进一步稳定该值，将小于1的值设置为1
+    clipped_preds = torch.clamp(net(features), 1, float('inf'))
+    rmse = torch.sqrt(criterion(torch.log(clipped_preds),
+                           torch.log(labels)))
+    return rmse.item()
 
-optimizer = torch.optim.Adam(net.parameters(), lr=0.2, weight_decay=1e-2)  #TODO: regularzation
+optimizer = torch.optim.Adam(net.parameters(), lr=0.1, weight_decay=1e-1)  #TODO: regularzation
 
-kf = KFold()
+kf = KFold(10)
 
-# loop over the dataset multiple times
-net.train()
-for epoch in range(500):
-    # train
-    running_loss = 0
-    for train_index, test_index in kf.split(train_features, train_labels):
+for epoch in tqdm(range(200)):
+    train_rmse = valid_rmse = 0
+    for train_index, valid_index in kf.split(train_features, train_labels):
+        # train
+        net.train()
         train_iter = data.DataLoader(data.TensorDataset(train_features[train_index], train_labels[train_index]),
-                                     batch_size=256, shuffle=True)
+                                     batch_size=64, shuffle=True)
         for inputs, labels in train_iter:
             outputs = net(inputs)
             loss = criterion(outputs, labels)
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
+        train_rmse += log_rmse(net, inputs, labels)
 
-            running_loss += loss.item()
-    print(f'Loss: {running_loss}', end=', ')
+        # valid
+        net.eval()
+        valid_rmse += log_rmse(net, train_features[valid_index], train_labels[valid_index])
+    print(f'Epoch {epoch}, train_rmse = {(train_rmse/kf.get_n_splits()):.3f}, valid_rmse = {(valid_rmse/kf.get_n_splits()):.3f}')
 
-    # test
-    net.eval()
-    error = log_rmse(net, train_features, train_labels)
-    print(f'error = {error}')
+print('Finished training.')
 
-print('Finished Training')
-
-
+net.eval()
+# 将网络应用于测试集。
+preds = net(test_features).detach().numpy()
+# 将其重新格式化以导出到Kaggle
+test_data['SalePrice'] = pd.Series(preds.reshape(1, -1)[0])
+submission = pd.concat([test_data['Id'], test_data['SalePrice']], axis=1)
+submission.to_csv('submission.csv', index=False)
+print('Finished prediction.')
