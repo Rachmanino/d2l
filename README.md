@@ -1,7 +1,7 @@
-# d2l
+# [d2l](https://zh.d2l.ai/)
 
 ## Requirements:
 
-- python3==3.10.0
-- pytorch==1.12.0
-- torchvision==0.13.0
+- Python==3.10.0
+- Pytorch==1.12.0
+- Torchvision==0.13.0
