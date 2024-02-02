@@ -1,3 +1,8 @@
+'''
+Implementation for a Kaggle competetion on:
+https://www.kaggle.com/competitions/house-prices-advanced-regression-techniques
+'''
+
 import pandas as pd
 import torch
 from torch import nn
@@ -5,6 +10,11 @@ from torch.utils import data
 from sklearn.model_selection import KFold   # K-fold
 from tqdm.rich import tqdm  # colorful progress-bar
 
+def try_gpu(i=0):  #@save
+    """如果存在，则返回gpu(i)，否则返回cpu()"""
+    if torch.cuda.device_count() >= i + 1:
+        return torch.device(f'cuda:{i}')
+    return torch.device('cpu')
 
 train_data = pd.read_csv('./train.csv')  # (1460, 80 features + 1 label)
 test_data = pd.read_csv('./test.csv')  # (1460, 80 features)
@@ -25,15 +35,16 @@ all_features = pd.get_dummies(all_features, dummy_na=True)
 
 train_size = train_data.shape[0]
 train_features = torch.tensor(
-    all_features[:train_size].values, dtype=torch.float32)
+    all_features[:train_size].values, dtype=torch.float32, device=try_gpu())
 test_features = torch.tensor(
-    all_features[train_size:].values, dtype=torch.float32)
+    all_features[train_size:].values, dtype=torch.float32, device=try_gpu())
 train_labels = torch.tensor(
-    train_data.SalePrice.values.reshape(-1, 1), dtype=torch.float32)
+    train_data.SalePrice.values.reshape(-1, 1), dtype=torch.float32, device=try_gpu())
 # 这里不要忘记reshape(-1, 1)来将train_labels转化为矩阵
 
 net = nn.Sequential(nn.Linear(train_features.shape[1], 1000), nn.ReLU(), nn.Dropout(), 
                     nn.Linear(1000, 1)) #TODO: model 
+net.to(try_gpu())
 
 criterion = nn.MSELoss()
 def log_rmse(net, features, labels):    
@@ -67,12 +78,13 @@ for epoch in tqdm(range(200)):
         net.eval()
         valid_rmse += log_rmse(net, train_features[valid_index], train_labels[valid_index])
     print(f'Epoch {epoch}, train_rmse = {(train_rmse/kf.get_n_splits()):.3f}, valid_rmse = {(valid_rmse/kf.get_n_splits()):.3f}')
-
 print('Finished training.')
+torch.save(net, './net.pt')
 
+# test
 net.eval()
 # 将网络应用于测试集。
-preds = net(test_features).detach().numpy()
+preds = net(test_features).detach().cpu().numpy()
 # 将其重新格式化以导出到Kaggle
 test_data['SalePrice'] = pd.Series(preds.reshape(1, -1)[0])
 submission = pd.concat([test_data['Id'], test_data['SalePrice']], axis=1)
