@@ -2,6 +2,9 @@
 
 ## Requirements:
 
-- Python==3.10.0
-- Pytorch==1.12.0
-- Torchvision==0.13.0
+- **python==3.10.0**
+- **torch==1.12.0**
+- **torchvision==0.13.0**
+- tqdm
+- tensorboard
+- **scikit-learn**(*for K-fold validation*)

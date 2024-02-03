@@ -1,5 +1,5 @@
 '''
-    Implementation for MLP for MNIST, test acc = 97.5%
+    Implementation for Logistic Regression on MNIST, acc = 92.35%
 '''
 
 import torch
@@ -14,7 +14,6 @@ batch_size = 256
 num_epochs = 10
 
 input_size = 28 * 28
-hidden_layer_size = 256
 num_classes = 10
 
 lr = 1e-2
@@ -40,10 +39,7 @@ test_dataloader = DataLoader(dataset = test_dataset,
 
 # net, loss fn and optimizer
 net = nn.Sequential(nn.Flatten(),  # [28, 28] to [784]
-                    nn.Linear(input_size, hidden_layer_size),
-                    nn.ReLU(),
-                    nn.Linear(hidden_layer_size, num_classes))
-
+                    nn.Linear(input_size, num_classes))
 criterion = nn.CrossEntropyLoss()
 optimizer = torch.optim.Adam(net.parameters(), lr=lr, weight_decay=wd)
 
